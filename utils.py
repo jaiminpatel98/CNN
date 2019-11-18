@@ -60,11 +60,13 @@ def convolution(image, filters, stride, bias):
 	filters = NUM_FILTERS x WIDTH x WIDTH tensor
 	stride = int
 	'''
-	dim_img = image.shape[0]
-	dim_filter = filters[0].shape[0]
+	dim_img = image.shape[1]
+	dim_filter = filters[0].shape[1]
 	num_filters = len(filters)
 	dim_out = (dim_img - dim_filter) / stride + 1
-	print("Conv Input Dim:", dim_img)
+	if len(image.shape) == 2:
+		image = np.expand_dims(image, axis=0)
+	print("Conv Input Dim:", image.shape)
 	print("Conv Filter Dim:", dim_filter)
 
 	if dim_out.is_integer() == False:
@@ -82,7 +84,7 @@ def convolution(image, filters, stride, bias):
 				if (x + dim_filter <= dim_img and y + dim_filter <= dim_img):
 					#print(y_out, x_out, image[y:y+dim_filter, x:x+dim_filter].shape)
 					#print(y, "->", y+dim_filter, x, "->", x+dim_filter, image[y:y+dim_filter, x:x+dim_filter].shape)
-					output[f, y_out, x_out] = np.sum(filters[f] * image[y:y + dim_filter, x:x + dim_filter]) # + bias
+					output[f, y_out, x_out] = np.sum(filters[f] * image[:, y:y + dim_filter, x:x + dim_filter]) # + bias
 				x_out += 1
 			y_out += 1
 	return output
@@ -133,13 +135,17 @@ def categorical_cross_entropy(output, labels):
 
 def convolution_back(in_conv, d_conv, filters, stride):
 	num_filters = len(filters)
-	dim_filter = filters[0].shape[0]
+	dim_filter = filters[0].shape[1]
 	num_in = len(in_conv)
 	dim_in = in_conv[0].shape[0]
+	if len(in_conv.shape) == 2:
+		in_conv = np.expand_dims(in_conv, axis=0)
 
 	d_output = np.zeros_like(in_conv)
 	d_filters = np.zeros_like(filters)
 	d_bias = np.zeros((num_filters, 1))
+	print(in_conv.shape)
+	print(d_conv.shape)
 
 	for f in range(0, num_filters):
 		y_out = 0
@@ -147,8 +153,8 @@ def convolution_back(in_conv, d_conv, filters, stride):
 			x_out = 0
 			for x in range(0, dim_in, stride):
 				if (x + dim_filter <= dim_in and y + dim_filter <= dim_in):
-					d_filters[f] += np.dot(d_conv[f, x_out, y_out], in_conv[f, y:y+dim_filter, x:x+dim_filter])
-					d_output[f, y:y+dim_filter, x:x+dim_filter] += d_conv[f, x_out, y_out] * filters[f]
+					d_filters[f] += np.dot(d_conv[f, x_out, y_out], in_conv[:, y:y+dim_filter, x:x+dim_filter])
+					d_output[:, y:y+dim_filter, x:x+dim_filter] += d_conv[f, x_out, y_out] * filters[f]
 					x_out += 1
 			y += 1
 		d_bias[f] = np.sum(filters[f])
@@ -190,10 +196,207 @@ def dense_back(d_out_dense, out_dense, in_dense, next_weights, bias):
 	d_bias = np.sum(d_dense).reshape(bias.shape)
 	return d_dense, d_weights, d_bias
 
-def fully_connected_back(weights, d_dense, out_pool):
+def fully_connected_back(weights, d_dense, in_pool):
 	d_fully_connected = np.dot(weights.T, d_dense)
-	d_pool = d_fully_connected.reshape(out_pool.shape)
+	d_pool = d_fully_connected.reshape(in_pool.shape)
 	return d_fully_connected, d_pool
+
+
+
+def adam_gradient_descent(X, y, filters, weights, bias, alpha, beta1, beta2, epsilon, total_cost):
+	[f1, f2, stride_f] = filters
+	[w1, w2] = weights
+	[b1, b2, b3, b4] = bias
+	dim_img = X[0].shape[0]
+	batch_cost = 0
+	
+	d_f1 = np.zeros_like(f1)
+	d_f2 = np.zeros_like(f2)
+	d_w1 = np.zeros_like(w1)
+	d_w2 = np.zeros_like(w2)
+	d_b1 = np.zeros_like(b1)
+	d_b2 = np.zeros_like(b2)
+	d_b3 = np.zeros_like(b3)
+	d_b4 = np.zeros_like(b4)
+
+	m_f1 = np.zeros_like(f1)
+	m_f2 = np.zeros_like(f2)
+	m_w1 = np.zeros_like(w1)
+	m_w2 = np.zeros_like(w2)
+	m_b1 = np.zeros_like(b1)
+	m_b2 = np.zeros_like(b2)
+	m_b3 = np.zeros_like(b3)
+	m_b4 = np.zeros_like(b4)
+
+	v_f1 = np.zeros_like(f1)
+	v_f2 = np.zeros_like(f2)
+	v_w1 = np.zeros_like(w1)
+	v_w2 = np.zeros_like(w2)
+	v_b1 = np.zeros_like(b1)
+	v_b2 = np.zeros_like(b2)
+	v_b3 = np.zeros_like(b3)
+	v_b4 = np.zeros_like(b4)
+
+	for i in range(len(X)):
+		input = X[i]
+		labels = np.zeros((10, 1))
+		labels[y[i]] = y[i]
+		loss, gradients = network_pass(input, labels, filters, weights, bias)
+		d_f1 += gradients[0]
+		d_f2 += gradients[1]
+		d_w1 += gradients[2]
+		d_w2 += gradients[3]
+		d_b1 += gradients[4]
+		d_b2 += gradients[5]
+		d_b3 += gradients[6]
+		d_b4 += gradients[7]
+		batch_cost += loss
+
+	m_f1 = beta1 * m_f1 + (1-beta1) + d_f1
+	v_f1 = beta2 * v_f1 + (1-beta2) + d_f1**2
+	f1 -= alpha / (np.sqrt(v_f1) + epsilon) * m_f1
+
+	m_f2 = beta1 * m_f2 + (1-beta1) + d_f2
+	v_f2 = beta2 * v_f2 + (1-beta2) + d_f2**2
+	f2 -= alpha / (np.sqrt(v_f2) + epsilon) * m_f2
+
+	m_w1 = beta1 * m_w1 + (1-beta1) + d_w1
+	v_w1 = beta2 * v_w1 + (1-beta2) + d_w1**2
+	w1 -= alpha / (np.sqrt(v_w1) + epsilon) * m_w1
+
+	m_w2 = beta1 * m_w2 + (1-beta1) + d_w2
+	v_w2 = beta2 * v_w2 + (1-beta2) + d_w2**2
+	w2 -= alpha / (np.sqrt(v_w2) + epsilon) * m_w2
+
+	m_b1 = beta1 * m_b1 + (1-beta1) + d_b1
+	v_b1 = beta2 * v_b1 + (1-beta2) + d_b1**2
+	b1 -= alpha / (np.sqrt(v_b1) + epsilon) * m_b1
+
+	m_b2 = beta1 * m_b2 + (1-beta1) + d_b2
+	v_b2 = beta2 * v_b2 + (1-beta2) + d_b2**2
+	b2 -= alpha / (np.sqrt(v_b2) + epsilon) * m_b2
+
+	m_b3 = beta1 * m_b3 + (1-beta1) + d_b3
+	v_b3 = beta2 * v_b3 + (1-beta2) + d_b3**2
+	b3 -= alpha / (np.sqrt(v_b3) + epsilon) * m_b3
+	
+	m_b4 = beta1 * m_b4 + (1-beta1) + d_b4
+	v_b4 = beta2 * v_b4 + (1-beta2) + d_b4**2
+	b4 -= alpha / (np.sqrt(v_b4) + epsilon) * m_b4
+
+	total_cost.append(batch_cost/len(X))
+
+	filters = [f1, f2, stride_f] 
+	weights = [w1, w2]
+	bias = [b1, b2, b3, b4]
+
+	return total_cost, filters, weights, bias
+
+def momentum_gradient_descent(X, y, filters, weights, bias, alpha, gamma, beta2, epsilon, total_cost):
+	[f1, f2, stride_f] = filters
+	[w1, w2] = weights
+	[b1, b2, b3, b4] = bias
+	dim_img = X[0].shape[0]
+	batch_cost = 0
+	
+	d_f1 = np.zeros_like(f1)
+	d_f2 = np.zeros_like(f2)
+	d_w1 = np.zeros_like(w1)
+	d_w2 = np.zeros_like(w2)
+	d_b1 = np.zeros_like(b1)
+	d_b2 = np.zeros_like(b2)
+	d_b3 = np.zeros_like(b3)
+	d_b4 = np.zeros_like(b4)
+
+	v_f1 = np.zeros_like(f1)
+	v_f2 = np.zeros_like(f2)
+	v_w1 = np.zeros_like(w1)
+	v_w2 = np.zeros_like(w2)
+	v_b1 = np.zeros_like(b1)
+	v_b2 = np.zeros_like(b2)
+	v_b3 = np.zeros_like(b3)
+	v_b4 = np.zeros_like(b4)
+
+	for i in range(len(X)):
+		input = X[i]
+		labels = np.zeros((10, 1))
+		labels[y[i]] = y[i]
+		loss, gradients = network_pass(input, labels, filters, weights, bias)
+		d_f1 += gradients[0]
+		d_f2 += gradients[1]
+		d_w1 += gradients[2]
+		d_w2 += gradients[3]
+		d_b1 += gradients[4]
+		d_b2 += gradients[5]
+		d_b3 += gradients[6]
+		d_b4 += gradients[7]
+		batch_cost += loss
+
+	v_f1 = gamma * v_f1 + alpha * d_f1
+	f1 -= v_f1
+
+	v_f2 = gamma * v_f2 + alpha * d_f2
+	f2 -= v_f2
+
+	v_w1 = gamma * v_w1 + alpha * d_w1
+	w1 -= v_w1
+
+	v_w2 = gamma * v_w2 + alpha * d_w2
+	w2 -= v_w2
+
+	v_b1 = gamma * v_b1 + alpha * d_b1
+	b1 -= v_b1
+
+	v_b2 = gamma * v_b2 + alpha * d_b2
+	b2 -= v_b2
+
+	v_b3 = gamma * v_b3 + alpha * d_b3
+	b3 -= v_b3
+
+	v_b4 = gamma * v_b4 + alpha * d_b4
+	b4 -= v_b4
+
+	total_cost.append(batch_cost/len(X))
+
+	filters = [f1, f2, stride_f] 
+	weights = [w1, w2]
+	bias = [b1, b2, b3, b4]
+
+	return total_cost, filters, weights, bias
+
+def network_pass(image, label, filters, weights, bias, pool=(2, 2)):
+	[f1, f2, stride_f] = filters
+	[w1, w2] = weights
+	[b1, b2, b3, b4] = bias
+	(dim_pool, stride_pool) = pool
+
+	conv_1 = convolution(image, f1, stride_f, b1)
+	conv_1 = relu(conv_1)
+	conv_2 = convolution(conv_1, f2, stride_f, b2)
+	conv_2 = relu(conv_2)
+	pool = maxpool(conv_2, dim_pool, stride_pool)
+	flat = flatten(pool)
+	dense_1 = dense(flat, w, b3)
+	dense_1 = relu(dense_1)
+	dense_2 = dense(dense_1, w2, b4)
+	output = softmax(dense_2)
+	
+	loss = categorical_cross_entropy(output, label)
+
+	d_output = cross_entropy_back(output, labels)
+	d_w2, d_b4 = softmax_back(d_output, dense_1, b4)
+	d_dense, d_w1, d_b3 = dense_back(d_output, dense_1, flat, w2, b3)
+	d_flat, d_pool = fully_connected_back(w1, d_dense, pool)
+	d_conv_2 = maxpool_back(conv_2, d_pool, dim_pool, stride_pool)
+	d_conv_2 = relu_back(d_conv_2, conv_2)
+	d_conv_1, d_f2, d_b2 = convolution_back(conv_1, d_conv_2, f2, stride_f)
+	d_conv_1 = relu_back(d_conv_1, conv_1)
+	d_input, d_f1, d_b1 = convolution_back(image, d_conv_1, f1, stride_f)
+
+	gradients = [d_f1, d_f2, d_w1, d_w2, d_b1, d_b2, d_b3, d_b4]
+
+	return loss, gradients
+	
 
 x, y = read_data('data/train.csv', 28, pad=2)
 labels = np.zeros((10, 1))
@@ -203,17 +406,17 @@ image = x[0]
 print("Input Shape:", x[0].shape)
 print("Number of Images:", len(x))
 
-f1 = init_filter((5, 5))
-f2 = init_filter((5, 5))
-w = init_weight((800, 196))
+f1 = init_filter((8, 1, 5, 5))
+f2 = init_filter((8, 8, 5, 5))
+w = init_weight((800, 1568))
 w2 = init_weight((10, 800))
-filters = [f1]
-filter2 = [f2]
+#filters = [f1]
+#filter2 = [f2]
 b1 = b2 = b3 = b4 = np.ones((1))
 
-conv = convolution(image, filters, 1, b1)
+conv = convolution(image, f1, 1, b1)
 conv = relu(conv)
-conv2 = convolution(conv[0], filter2, 1, b2)
+conv2 = convolution(conv, f2, 1, b2)
 conv2 = relu(conv2)
 mp = maxpool(conv, 2, 2)
 flat = flatten(mp)
@@ -246,11 +449,11 @@ print("Gradient of Pooled:", d_pool.shape)
 
 d_conv2 = maxpool_back(conv2, d_pool, 2, 2)
 d_conv2 = relu_back(d_conv2, conv2)
-d_conv1, d_f2, d_b2 = convolution_back(conv, d_conv2, filter2, 1)
+d_conv1, d_f2, d_b2 = convolution_back(conv, d_conv2, f2, 1)
 d_conv1 = relu_back(d_conv1, conv)
 x = np.zeros((1, 32, 32))
 x[0] = image 
-d_input, d_f1, d_b1 = convolution_back(x, d_conv1, filters, 1)
+d_input, d_f1, d_b1 = convolution_back(x, d_conv1, f1, 1)
 
 print("Gradient of Conv2:", d_conv2.shape)
 print("Gradient of Conv1:", d_conv1.shape)
