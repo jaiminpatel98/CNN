@@ -217,118 +217,6 @@ def gradient_pool(d_dense, in_pool):
 	d_pool = d_dense.reshape(in_pool.shape)
 	return d_pool
 
-
-
-def adam_gradient_descent(X, y, m, v, filters, weights, bias, total_cost, count, accuracy, predictions, w1_batch, b1_batch, alpha, beta1, beta2, epsilon):
-	[f1, f2, stride_f] = filters
-	[w1, w2] = weights
-	[b1, b2, b3, b4] = bias
-	dim_img = X[0].shape[0]
-	w1_total = []
-	b1_total = []
-	batch_cost = 0
-	batch_correct = 0
-
-
-	d_f1 = np.zeros_like(f1)
-	d_f2 = np.zeros_like(f2)
-	d_w1 = np.zeros_like(w1)
-	d_w2 = np.zeros_like(w2)
-	d_b1 = np.zeros_like(b1)
-	d_b2 = np.zeros_like(b2)
-	d_b3 = np.zeros_like(b3)
-	d_b4 = np.zeros_like(b4)
-
-	[m_f1, m_f2, m_w1, m_w2, m_b1, m_b2, m_b3, m_b4] = m 
-	[v_f1, v_f2, v_w1, v_w2, v_b1, v_b2, v_b3, v_b4] = v
-
-	for i in range(len(X)):
-		input = X[i]
-		loss, output, gradients = network_pass(input, labels, filters, weights, bias)
-		d_f1 += gradients[0]
-		d_f2 += gradients[1]
-		d_w1 += gradients[2]
-		d_w2 += gradients[3]
-		d_b1 += gradients[4]
-		d_b2 += gradients[5]
-		d_b3 += gradients[6]
-		d_b4 += gradients[7]
-		prediction = np.nanargmax(output)
-		predictions.append(prediction)
-		if prediction == y.iloc[i]:
-			batch_correct += 1
-		batch_cost += loss
-	accuracy.append(batch_correct/len(X))
-	print("Accuracy:", batch_correct/len(X))
-	total_cost.append(batch_cost/len(X))
-	#print(d_f1)
-	#print(f1)
-	#print(d_f2)
-	#print(d_w1)
-	#print(d_w2)
-	#print(d_b1)
-	#print(d_b2)
-	#print(d_b3)
-	#print(d_b4)
-	m_f1 = beta1 * m_f1 + (1-beta1) * (d_f1 / len(X))
-	v_f1 = beta2 * v_f1 + (1-beta2) * (d_f1 / len(X))**2
-	m_f1_c = m_f1 / (1 - beta1**count)
-	v_f1_c = v_f1 / (1 - beta2**count)
-	f1 -= alpha / (np.sqrt(v_f1_c) + epsilon) * m_f1_c
-
-	m_f2 = beta1 * m_f2 + (1-beta1) * (d_f2 / len(X))
-	v_f2 = beta2 * v_f2 + (1-beta2) * (d_f2 / len(X))**2
-	m_f2_c = m_f2 / (1 - beta1**count)
-	v_f2_c = v_f2 / (1 - beta2**count)
-	f2 -= alpha / (np.sqrt(v_f2_c) + epsilon) * m_f2_c
-
-	m_w1 = beta1 * m_w1 + (1-beta1) * (d_w1 / len(X))
-	v_w1 = beta2 * v_w1 + (1-beta2) * (d_w1 / len(X))**2
-	m_w1_c = m_w1 / (1 - beta1)
-	v_w1_c = v_w1 / (1 - beta2)
-	w1 -= alpha / (np.sqrt(v_w1_c) + epsilon) * m_w1_c
-
-	m_w2 = beta1 * m_w2 + (1-beta1) * (d_w2 / len(X))
-	v_w2 = beta2 * v_w2 + (1-beta2) * (d_w2 / len(X))**2
-	m_w2_c = m_w2 / (1 - beta1**count)
-	v_w2_c = v_w2 / (1 - beta2**count)
-	w2 -= alpha / (np.sqrt(v_w2_c) + epsilon) * m_w2_c
-
-	m_b1 = beta1 * m_b1 + (1-beta1) * (d_b1 / len(X))
-	v_b1 = beta2 * v_b1 + (1-beta2) * (d_b1 / len(X))**2
-	m_b1_c = m_b1 / (1 - beta1**count)
-	v_b1_c = v_b1 / (1 - beta2**count)
-	b1 -= alpha / (np.sqrt(v_b1_c) + epsilon) * m_b1_c
-
-	m_b2 = beta1 * m_b2 + (1-beta1) * (d_b2 / len(X))
-	v_b2 = beta2 * v_b2 + (1-beta2) * (d_b2 / len(X))**2
-	m_b2_c = m_b2 / (1 - beta1**count)
-	v_b2_c = v_b2 / (1 - beta2**count)
-	b2 -= alpha / (np.sqrt(v_b2_c) + epsilon) * m_b2_c
-
-	m_b3 = beta1 * m_b3 + (1-beta1) * (d_b3 / len(X))
-	v_b3 = beta2 * v_b3 + (1-beta2) * (d_b3 / len(X))**2
-	m_b3_c = m_b3 / (1 - beta1**count)
-	v_b3_c = v_b3 / (1 - beta2**count)
-	b3 -= alpha / (np.sqrt(v_b3_c) + epsilon) * m_b3_c
-	
-	m_b4 = beta1 * m_b4 + (1-beta1) * (d_b4 / len(X))
-	v_b4 = beta2 * v_b4 + (1-beta2) * (d_b4 / len(X))**2
-	m_b4_c = m_b4 / (1 - beta1**count)
-	v_b4_c = v_b4 / (1 - beta2**count)
-	b4 -= alpha / (np.sqrt(v_b4_c) + epsilon) * m_b4_c
-
-	w1_total.append(np.average(w1))
-	b1_total.append(np.average(b1))
-
-	filters = [f1, f2, stride_f]
-	weights = [w1, w2]
-	bias = [b1, b2, b3, b4]
-	m = [m_f1_c, m_f2_c, m_w1_c, m_w2_c, m_b1_c, m_b2_c, m_b3_c, m_b4_c]
-	v = [v_f1_c, v_f2_c, v_w1_c, v_w2_c, v_b1_c, v_b2_c, v_b3_c, v_b4_c]
-
-	return total_cost, accuracy, w1_total, b1_total, predictions, filters, weights, bias, m, v
-
 def momentum_gradient_descent(X, y, v, filters, weights, bias, total_cost, accuracy, w1_total, b1_total, predictions, alpha, gamma):
 	[f1, f2, stride_f] = filters
 	[w1, w2] = weights
@@ -610,33 +498,14 @@ def plot_loss(loss):
 	plt.xlabel("Batches")
 	plt.show()
 
-def plot_3d(loss, w1, b1):
-	x = w1
-	y = b1
-	x, y = np.meshgrid(x, y)
-	z = loss
-	fig = plt.figure(dpi = 100)
-	ax = fig.gca(projection = '3d')
-	surface = ax.plot_surface(x, y, z, rstride = 1, cstride = 1, cmap = cm.coolwarm, linewidth = 0, antialiased = False)
-	cset = ax.contourf(x, y, z, 25, zdir = 'z', offset =- 1, alpha = 0.6, cmap = cm.coolwarm)
-	ax.set_xlabel('w1')
-	ax.set_xlim(min(x) - 1, max(x) + 1)
-	ax.set_ylabel('b1')
-	ax.set_ylim(min(y) - 1, max(y) + 1)
-	ax.set_zlabel('loss')
-	ax.set_zlim(min(z) - 1, max(z) + 1)
-	ax.view_init(elev = 25, azim = -75)
-	ax.dist = 12
-	title = ax.set_title('deltaw1 and deltab1 over 1 epoch')
-	fig.savefig("fig.jpg", dpi=2000)
-	plt.show()
 
 
 
 
 
-x, y = read_data('data/train.csv', 28, pad=2)
-x_train, y_train, x_test, y_test = shuffle_split(x, y, 70)
+
+#x, y = read_data('data/train.csv', 28, pad=2)
+#x_train, y_train, x_test, y_test = shuffle_split(x, y, 70)
 #print(x_train.shape, y_train.shape, x_test.shape, y_test.shape)
 #total_loss, accuracy, w1_batch, b1_batch, filters, weights, bias = train_network(x_train, 28, y_train, 8, 8, 5, 1)
 #plot_loss(total_loss)
@@ -648,10 +517,10 @@ x_train, y_train, x_test, y_test = shuffle_split(x, y, 70)
 
 # print("Input Shape:", x[0].shape)
 # print("Number of Images:", len(x))
-image = x_train[0]
-labels = np.zeros((10, 1))
-labels[y_train[0]] = 1
-label = y_train[0]
+#image = x_train[0]
+#labels = np.zeros((10, 1))
+#labels[y_train[0]] = 1
+#label = y_train[0]
 # f1 = init_filter((8, 1, 5, 5))
 # f2 = init_filter((8, 8, 5, 5))
 # w1 = init_weight((128, 1568))
