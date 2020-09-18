@@ -93,6 +93,9 @@ def convolution(image, filters, stride, bias):
 	return output
 
 def maxpool(input, size, stride):
+	'''
+	Downsamples an input matrix
+	'''
 	dim_in = input[0].shape[0]
 	dim_out = (dim_in - size) / stride + 1
 	num_in = len(input)
@@ -120,22 +123,34 @@ def relu(input):
 	return input * (input > 0)
 
 def flatten(in_pool):
+	'''
+	Prepares input matrix for fully connected layer processing
+	'''
 	num_pool = len(in_pool)
 	dim_pool = in_pool[0].shape[0]
 	flat = in_pool.reshape((num_pool * dim_pool * dim_pool, 1))
 	return flat
 
 def dense(input, weights, bias):
+	'''
+	Processes a fully connected layer
+	'''
 	output = np.dot(weights, input) + bias
 	return output
 
 def softmax(out_dense):
+	'''
+	Outputs classification scores
+	'''
 	return (np.exp(out_dense)) / (np.sum(np.exp(out_dense)))
 
 def categorical_cross_entropy(output, labels):
 	return -np.sum(labels * np.log(output))
 
 def convolution_back(in_conv, d_conv, filters, stride):
+	'''
+	Reverse processing of convolutional layer
+	'''
 	num_filters = len(filters)
 	dim_filter = filters[0].shape[1]
 	num_in = len(in_conv)
@@ -163,6 +178,9 @@ def convolution_back(in_conv, d_conv, filters, stride):
 	return d_output, d_filters, d_bias
 
 def maxpool_back(in_pool, d_pool, size, stride):
+	'''
+	Reverse processing of downsampling step
+	'''
 	num_in = len(in_pool)
 	dim_in = in_pool[0].shape[0]
 
@@ -185,11 +203,17 @@ def relu_back(input):
 	return 1 * (input > 0)
 
 def gradient_initial(output, labels):
+	'''
+	Prepares a gradient for backpropagation
+	'''
 	gradient_out = np.zeros((10, 1))
 	gradient_out[label] = -1 / output[label]
 	return gradient_out
 
 def gradient_softmax(gradient_initial, in_dense, label):
+	'''
+	Calculates gradient of the softmax function
+	'''
 	in_exp = np.exp(in_dense)
 	in_sum = np.sum(in_exp)
 	d_out = -in_exp[label] * in_exp / (in_sum ** 2)
@@ -199,9 +223,10 @@ def gradient_softmax(gradient_initial, in_dense, label):
 	#d_bias = np.sum(d_cross_entropy, axis = 1).reshape(in_bias.shape)
 	return d_out
 
-
-
 def gradient_dense(d_out, in_dense, in_weights):
+	'''
+	Calculates gradient of a fully connected layer
+	'''
 	d_weights = np.dot(d_out, in_dense.T)
 	d_bias = d_out
 	d_dense = np.dot(in_weights.T, d_out)
@@ -213,11 +238,17 @@ def gradient_dense(d_out, in_dense, in_weights):
 	return d_dense, d_weights, d_bias
 
 def gradient_pool(d_dense, in_pool):
+	'''
+	Prepares gradient for reverse downsample processing
+	'''
 	#d_fully_connected = np.dot(weights.T, d_dense)
 	d_pool = d_dense.reshape(in_pool.shape)
 	return d_pool
 
 def momentum_gradient_descent(X, y, v, filters, weights, bias, total_cost, accuracy, w1_total, b1_total, predictions, alpha, gamma):
+	'''
+	Calculates batch momentum gradient descent
+	'''
 	[f1, f2, stride_f] = filters
 	[w1, w2] = weights
 	[b1, b2, b3, b4] = bias
@@ -291,6 +322,9 @@ def momentum_gradient_descent(X, y, v, filters, weights, bias, total_cost, accur
 	return total_cost, accuracy, w1_total, b1_total, predictions, filters, weights, bias, v
 
 def forward_pass(image, label, filters, weights, bias, pool = (2, 2)):
+	'''
+	Forward CNN processing of a single image
+	'''
 	[f1, f2, stride_f] = filters
 	[w1, w2] = weights
 	[b1, b2, b3, b4] = bias
@@ -312,6 +346,9 @@ def forward_pass(image, label, filters, weights, bias, pool = (2, 2)):
 	return loss, output
 
 def network_pass(image, label, filters, weights, bias, pool = (2, 2)):
+	'''
+	Complete CNN processing of a single image
+	'''
 	[f1, f2, stride_f] = filters
 	[w1, w2] = weights
 	[b1, b2, b3, b4] = bias
@@ -353,6 +390,9 @@ def network_pass(image, label, filters, weights, bias, pool = (2, 2)):
 	return loss, output, gradients
 
 def backward_pass(output, label, filters, weights, bias, pool = (2,2)):
+	'''
+	Backward CNN processing of a single image
+	'''
 	d_initial = gadient_initial(output, label)
 	d_w2, d_b4 = softmax_back(d_output, dense_1, b4)
 	d_dense, d_w1, d_b3 = dense_back(d_output, dense_1, flat, w2, b3)
@@ -368,7 +408,11 @@ def backward_pass(output, label, filters, weights, bias, pool = (2,2)):
 	return gradients
 
 
-def train_network(images, dim_img, labels, num_filters1, num_filters2, dim_filters, stride, alpha = 0.01, gamma = 0.88, batch_size = 20, epochs = 20):	
+def train_network(images, dim_img, labels, num_filters1, num_filters2, dim_filters, stride, alpha = 0.01, gamma = 0.88, batch_size = 20, epochs = 20):
+	'''
+	Train network on dataset
+	This function saves model once trained
+	'''
 	f1 = init_filter((num_filters1, 1, dim_filters, dim_filters))
 	f2 = init_filter((num_filters2, num_filters1, dim_filters, dim_filters))
 	w1 = init_weight((400, 1152))
@@ -450,6 +494,9 @@ def train_network(images, dim_img, labels, num_filters1, num_filters2, dim_filte
 	return total_cost, accuracy, w1_batch, b1_batch, filters, weights, biases
 
 def validation(x, y, filters, weights, bias):
+	'''
+	Validates a network using trained weights and biases
+	'''
 	correct_class_count = np.zeros((10, 1))
 	predictions = []
 	loss_score = []
@@ -469,6 +516,9 @@ def validation(x, y, filters, weights, bias):
 	return correct_class_count, predictions, loss_score, correct
 
 def predict(image, label, filters, weights, bias, pool = (2, 2)):
+	'''
+	Predict the classification of a single image
+	'''
 	[f1, f2, stride_f] = filters
 	[w1, w2] = weights
 	[b1, b2, b3, b4] = bias
@@ -493,97 +543,10 @@ def predict(image, label, filters, weights, bias, pool = (2, 2)):
 	return loss, prediction, probability
 
 def plot_loss(loss):
+	'''
+	Plot the loss of a network
+	'''
 	plt.plot(loss)
 	plt.ylabel("Loss")
 	plt.xlabel("Batches")
 	plt.show()
-
-
-
-
-
-
-
-#x, y = read_data('data/train.csv', 28, pad=2)
-#x_train, y_train, x_test, y_test = shuffle_split(x, y, 70)
-#print(x_train.shape, y_train.shape, x_test.shape, y_test.shape)
-#total_loss, accuracy, w1_batch, b1_batch, filters, weights, bias = train_network(x_train, 28, y_train, 8, 8, 5, 1)
-#plot_loss(total_loss)
-#plot_loss(accuracy)
-#w1 = weights[0]
-#b1 = bias[0]
-#plot_3d(total_loss, w1, b1)
-
-
-# print("Input Shape:", x[0].shape)
-# print("Number of Images:", len(x))
-#image = x_train[0]
-#labels = np.zeros((10, 1))
-#labels[y_train[0]] = 1
-#label = y_train[0]
-# f1 = init_filter((8, 1, 5, 5))
-# f2 = init_filter((8, 8, 5, 5))
-# w1 = init_weight((128, 1568))
-# w2 = init_weight((10, 128))
-# b1 = np.zeros((8, 1))
-# b2 = np.zeros((8, 1))
-# b3 = np.zeros((128, 1))
-# b4 = np.zeros((10, 1))
-# filters = [f1, f2, 2]
-# weights = [w1, w2]
-# biases = [b1, b2, b3, b4]
-
-
-# conv = convolution(image, f1, 1, b1)
-# conv = relu(conv)
-# conv2 = convolution(conv, f2, 1, b2)
-# conv2 = relu(conv2)
-# mp = maxpool(conv, 2, 2)
-# flat = flatten(mp)
-# d = dense(flat, w1, b3)
-# d = relu(d)
-# d2 = dense(d, w2, b4)
-# out = softmax(d2)
-# loss = categorical_cross_entropy(out, labels)
-
-# print(mp.shape)
-# print("Flat Shape:", flat.shape)
-# print("Dense Output Shape:", d.shape)
-# print("Dense 2 Output Shape:", d2.shape)
-# print("Final Output Shape:", out.shape)
-# print("Final Output:\n", out)
-# print("Loss:", loss)
-
-# d_initial = gradient_initial(out, label)
-# d_out = gradient_softmax(d_initial, d2, label)
-# print(d_out.shape)
-# print(d.shape)
-# print(w2.shape)
-# d_d2, d_w2, d_b4 = gradient_dense(d_out, d, w2)
-# d_d1, d_w1, d_b3 = gradient_dense(d_d2, flat, w1)
-# d_pool = gradient_pool(d_d1, mp)
-
-# print("Gradient of softmax:\n", d_initial)
-# print("Gradient of Output:\n", d_out)
-# print("Gradient of W2:", d_w2.shape)
-# print("Gradient of B4:", d_b4.shape)
-# print("Gradient of Dense:", d_d1.shape)
-# print("Gradient of W:", d_w1.shape)
-# print("Gradient of B3:", d_b3.shape)
-# print("Gradient of Pooled:", d_pool.shape)
-
-# d_conv2 = maxpool_back(conv2, d_pool, 2, 2)
-# d_conv2 = relu_back(conv2)
-# d_conv1, d_f2, d_b2 = convolution_back(conv, d_conv2, f2, 1)
-# d_conv1 = relu_back(conv)
-# x = np.zeros((1, 32, 32))
-# x[0] = image 
-# d_input, d_f1, d_b1 = convolution_back(image, d_conv1, f1, 1)
-
-# print("Gradient of Conv2:", d_conv2.shape)
-# print("Gradient of Conv1:", d_conv1.shape)
-# print("Gradient of Filter2:", d_f2.shape)
-# print("Gradient of B2:", d_b2.shape)
-# print("Gradient of Image:", d_input.shape)
-# print("Gradient of Filter1:", d_f1.shape)
-# print("Gradient of B1:", d_b1.shape)
